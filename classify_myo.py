@@ -4,9 +4,12 @@ from collections import Counter
 import struct
 import sys
 import time
-
 import numpy as np
-
+FIST = 5
+PINKY = 4
+SPREAD = 3
+FLEX = 2
+EXTEND = 1
 try:
     from sklearn import neighbors, svm
     HAVE_SK = True
@@ -45,13 +48,28 @@ if __name__ == '__main__':
     hnd = EMGHandler(m)
     m.add_emg_handler(hnd)
     m.connect()
-
+    pressedr = None
+    rcounter = 0
+    rtime = 10
+    rcutoff = 23
+    pressedkeys = [None]
     try:
         while True:
             m.run()
 
             r = m.history_cnt.most_common(1)[0][0]
-
+            if m.history_cnt[r] > rcutoff:
+                if pressedr != r:
+                    pressedr = r
+                    rcounter = 0
+                else:
+                    rcounter += 1
+                    if rcounter >= rtime:
+                        if pressedkeys[-1] != r:
+                            print('pressed', r)
+                            pressedkeys.append(r)
+                            if len(pressedkeys) > 20:
+                                pressedkeys.pop(0)
             if HAVE_PYGAME:
                 for ev in pygame.event.get():
                     if ev.type == QUIT or (ev.type == KEYDOWN and ev.unicode == 'q'):
@@ -85,10 +103,11 @@ if __name__ == '__main__':
                     scr.fill((0,0,0), (x+130, y + txt.get_height() / 2 - 10, len(m.history) * 20, 20))
                     scr.fill(clr, (x+130, y + txt.get_height() / 2 - 10, m.history_cnt[i] * 20, 20))
 
-                if HAVE_SK:
+                if HAVE_SK and m.cls.nn != None:
+                    
                     dists, inds = m.cls.nn.kneighbors(hnd.emg)
                     for i, (d, ind) in enumerate(zip(dists[0], inds[0])):
-                        y = m.cls.Y[3*ind]
+                        y = m.cls.Y[myo.NUMSAMPLES*ind]
                         text(scr, font, '%d %6d' % (y, d), (650, 20 * i))
 
                 pygame.display.flip()
